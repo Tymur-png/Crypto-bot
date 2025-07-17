@@ -1,3 +1,4 @@
+import os
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -11,7 +12,7 @@ from telegram.ext import (
 import httpx
 
 # --- Настройки ---
-BOT_TOKEN = '8144983413:AAEbKi_tv8KIWmxk_qyDoSEeBYJOUuFjayQ'  # Вставь сюда свой токен от BotFather
+BOT_TOKEN = os.getenv('BOT_TOKEN')  # Токен теперь читается из переменной окружения
 
 INTERVALS = [0.1, 1, 5, 10]
 
@@ -28,9 +29,13 @@ user_states = {}
 # --- Получение цены ---
 async def get_price(symbol: str) -> float:
     url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(url)
+        if resp.status_code != 200:
+            raise ValueError(f"HTTP ошибка: {resp.status_code}")
         data = resp.json()
+        if 'price' not in data:
+            raise ValueError(f"Ключ 'price' отсутствует в ответе: {data}")
         return float(data['price'])
 
 # --- Команда /start ---
@@ -142,6 +147,7 @@ async def handle_threshold_input(update: Update, context: ContextTypes.DEFAULT_T
             f"Порог падения: -{state['drop_threshold']}, порог роста: +{state['rise_threshold']}"
         )
 
+        # Запускаем фоновую задачу по отслеживанию цены, если еще не запущена
         if 'price_task' not in context.application.bot_data:
             context.application.bot_data['price_task'] = context.application.create_task(price_watcher(context))
 
@@ -219,31 +225,4 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # --- Команда /stop ---
-async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    if chat_id in user_states:
-        del user_states[chat_id]
-        await update.message.reply_text("Отслеживание остановлено. Чтобы начать заново, используйте /start.")
-    else:
-        await update.message.reply_text("У вас нет активного отслеживания. Используйте /start для настройки.")
-
-# --- Запуск бота ---
-def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("history", history))
-    app.add_handler(CommandHandler("status", status))
-    app.add_handler(CommandHandler("stop", stop))
-
-    app.add_handler(CallbackQueryHandler(coin_chosen, pattern=r"^coin_"))
-    app.add_handler(CallbackQueryHandler(currency_chosen, pattern=r"^currency_"))
-    app.add_handler(CallbackQueryHandler(interval_chosen, pattern=r"^interval_"))
-
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_threshold_input))
-
-    print("Бот запущен...")
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+async
