@@ -14,8 +14,8 @@ from telegram.ext import (
 )
 
 # --- Настройки ---
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-RAILWAY_URL = os.getenv("RAILWAY_URL")  # Railway добавляет это значение автоматически
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # Токен из переменной окружения
+RAILWAY_URL = os.getenv("RAILWAY_URL")  # Домен Railway (например yourapp.up.railway.app)
 
 INTERVALS = [0.1, 1, 5, 10]
 COINS = [
@@ -36,7 +36,7 @@ async def get_price(symbol: str) -> float:
         raise ValueError(f"HTTP ошибка: {resp.status_code}")
     data = resp.json()
     if 'price' not in data:
-        raise ValueError(f"Ключ 'price' отсутствует в ответе Binance. Ответ: {data}")
+        raise ValueError(f"Ключ 'price' отсутствует в ответе: {data}")
     return float(data['price'])
 
 # --- Команда /start ---
@@ -218,7 +218,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Порог падения: {drop}\nПорог роста: {rise}\nПоследняя цена: {last_price:.4f}"
     )
 
-# --- Запуск приложения ---
+# --- Webhook-запуск ---
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
@@ -239,6 +239,6 @@ if __name__ == "__main__":
     app.run_webhook(
         listen="0.0.0.0",
         port=PORT,
-        webhook_path=WEBHOOK_PATH,
+        url_path=BOT_TOKEN,
         webhook_url=WEBHOOK_URL,
     )
